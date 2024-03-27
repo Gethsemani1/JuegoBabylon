@@ -1,0 +1,142 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Juego de la Vida de Conway en Babylon.js</title>
+    <script src="https://cdn.babylonjs.com/babylon.js"></script>
+    <style>
+        canvas {
+            width: 100%;
+            height: 100%;
+            touch-action: none;
+        }
+    </style>
+</head>
+<body>
+    <canvas id="renderCanvas"></canvas>
+    <script>
+        window.onload = function () {
+            var canvas = document.getElementById("renderCanvas");
+            var engine = new BABYLON.Engine(canvas, true);
+            var createScene = function () {
+                var scene = new BABYLON.Scene(engine);
+
+                // Cámara
+                var camera = new BABYLON.ArcRotateCamera("Cámara", -Math.PI / 2, Math.PI / 20,30, BABYLON.Vector3.Zero(), scene);
+                camera.attachControl(canvas, true);
+
+                // Cuadrícula de cubos
+                var tamañoCuadrícula = 20; // Número de cubos en cada dirección
+                var espaciadoCubo = 1; // Distancia entre cubos
+
+                var cubos = [];
+
+                // Crear cuadrícula inicial de cubos con estado aleatorio
+                for (var x = -tamañoCuadrícula; x <= tamañoCuadrícula; x++) {
+                    for (var z = -tamañoCuadrícula; z <= tamañoCuadrícula; z++) {
+                        var cubo = BABYLON.MeshBuilder.CreateBox("cubo", {size: 1}, scene);
+                        cubo.position = new BABYLON.Vector3(x * espaciadoCubo, 0, z * espaciadoCubo);
+                        cubo.isAlive = Math.random() < 0.5; // Estado inicial aleatorio: vivo o muerto
+                        cubos.push(cubo);
+                    }
+                }
+
+                // Función para actualizar la cuadrícula según las reglas del Juego de la Vida
+                function actualizarCuadrícula() {
+                    var cubosParaEliminar = [];
+
+                    for (var i = 0; i < cubos.length; i++) {
+                        var cubo = cubos[i];
+                        var numVecinosVivos = contarVecinosVivos(cubo);
+
+                        if (cubo.isAlive) {
+                            // Cualquier célula viva con menos de dos vecinos vivos muere, como si estuviera subpoblada.
+                            // Cualquier célula viva con dos o tres vecinos vivos vive en la siguiente generación.
+                            // Cualquier célula viva con más de tres vecinos vivos muere, como si estuviera sobrepoblada.
+                            cubo.isAlive = numVecinosVivos == 2 || numVecinosVivos == 3;
+                        } else {
+                            // Cualquier célula muerta con exactamente tres vecinos vivos se convierte en una célula viva, como si fuera por reproducción.
+                            cubo.isAlive = numVecinosVivos == 3;
+                        }
+
+                        if (!cubo.isAlive) {
+                            cubosParaEliminar.push(cubo);
+                        }
+                    }
+
+                    // Eliminar cubos muertos de la escena
+                    for (var i = 0; i < cubosParaEliminar.length; i++) {
+                        var cuboParaEliminar = cubosParaEliminar[i];
+                        cuboParaEliminar.dispose();
+                        cubos.splice(cubos.indexOf(cuboParaEliminar), 1);
+                    }
+                }
+
+                // Función para contar los vecinos vivos de un cubo
+                function contarVecinosVivos(cubo) {
+                    var count = 0;
+                    var posición = cubo.position;
+
+                    for (var i = 0; i < cubos.length; i++) {
+                        var otroCubo = cubos[i];
+                        if (otroCubo !== cubo) {
+                            var otraPosición = otroCubo.position;
+                            if (Math.abs(otraPosición.x - posición.x) <= espaciadoCubo &&
+                                Math.abs(otraPosición.z - posición.z) <= espaciadoCubo) {
+                                if (otroCubo.isAlive) {
+                                    count++;
+                                }
+                            }
+                        }
+                    }
+
+                    return count;
+                }
+
+                // Temporizador para actualizar la cuadrícula cada segundo
+                setInterval(actualizarCuadrícula, 1000);
+
+                // Crear contorno (malla)
+                var líneas = [];
+                var materialContorno = new BABYLON.StandardMaterial("materialContorno", scene);
+                materialContorno.diffuseColor = new BABYLON.Color3(0, 0, 0); 
+
+                for (var i = -tamañoCuadrícula * espaciadoCubo; i <= tamañoCuadrícula * espaciadoCubo; i += espaciadoCubo) {
+                    var puntos = [
+                        new BABYLON.Vector3(-tamañoCuadrícula * espaciadoCubo, 0, i),
+                        new BABYLON.Vector3(tamañoCuadrícula * espaciadoCubo, 0, i)
+                    ];
+                    var línea = BABYLON.MeshBuilder.CreateLines("línea", {points: puntos}, scene);
+                    línea.color = new BABYLON.Color3(0, 0, 0); // Color negro para las líneas
+                    línea.material = materialContorno;
+                    líneas.push(línea);
+                }
+
+                for (var i = -tamañoCuadrícula * espaciadoCubo; i <= tamañoCuadrícula * espaciadoCubo; i += espaciadoCubo) {
+                    var puntos = [
+                        new BABYLON.Vector3(i, 0, -tamañoCuadrícula * espaciadoCubo),
+                        new BABYLON.Vector3(i, 0, tamañoCuadrícula * espaciadoCubo)
+                    ];
+                    var línea = BABYLON.MeshBuilder.CreateLines("línea", {points: puntos}, scene);
+                    línea.color = new BABYLON.Color3(0, 0, 0); 
+                    línea.material = materialContorno;
+                    líneas.push(línea);
+                }
+
+                return scene;
+            }
+
+            var escena = createScene();
+
+            engine.runRenderLoop(function () {
+                escena.render();
+            });
+
+            window.addEventListener("resize", function () {
+                engine.resize();
+            });
+        }
+    </script>
+</body>
+</html>
